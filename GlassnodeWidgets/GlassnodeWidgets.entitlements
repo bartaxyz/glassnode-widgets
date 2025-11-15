@@ -12,5 +12,15 @@
 	<array>
 		<string>CloudKit</string>
 	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)$(CFBundleIdentifier)</string>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.ondrejbarta.GlassnodeWidgets</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.ondrejbarta.GlassnodeWidgets</string>
+	</array>
 </dict>
 </plist>

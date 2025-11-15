@@ -7,26 +7,20 @@
 
 import SwiftUI
 import SwiftData
+import Security
 
 @main
 struct GlassnodeWidgetsApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    let glassnodeService = GlassnodeService()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SettingsView()
+                .navigationTitle("Glassnode Widgets")
+                .environment(\.glassnodeService, glassnodeService)
+                .frame(width: 480, height: 280)
         }
-        .modelContainer(sharedModelContainer)
+        .windowResizability(.contentSize)
+        .defaultSize(width: 480, height: 280)
     }
 }
