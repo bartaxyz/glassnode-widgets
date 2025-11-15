@@ -6,8 +6,42 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4AFE51532EC914D600FCEC43 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4AFE51522EC914D600FCEC43 /* WidgetKit.framework */; };
+		4AFE51552EC914D600FCEC43 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4AFE51542EC914D600FCEC43 /* SwiftUI.framework */; };
+		4AFE51622EC914D700FCEC43 /* ChartWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4AFE51502EC914D600FCEC43 /* ChartWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4AFE51602EC914D700FCEC43 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4AFE51052EC8C59C00FCEC43 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4AFE514F2EC914D600FCEC43;
+			remoteInfo = ChartWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4AFE51632EC914D700FCEC43 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4AFE51622EC914D700FCEC43 /* ChartWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		4AFE510D2EC8C59C00FCEC43 /* GlassnodeWidgets.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassnodeWidgets.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4AFE51502EC914D600FCEC43 /* ChartWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ChartWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4AFE51522EC914D600FCEC43 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
+		4AFE51542EC914D600FCEC43 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
+		4AFE51682EC914FB00FCEC43 /* ChartWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ChartWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -18,6 +52,24 @@
 			);
 			target = 4AFE510C2EC8C59C00FCEC43 /* GlassnodeWidgets */;
 		};
+		4AFE51672EC914D700FCEC43 /* Exceptions for "ChartWidget" folder in "ChartWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4AFE514F2EC914D600FCEC43 /* ChartWidgetExtension */;
+		};
+		4AFE516A2EC9159700FCEC43 /* Exceptions for "GlassnodeWidgets" folder in "ChartWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Environment+GlassnodeService.swift",
+				GlassnodeService.swift,
+				GlassnodeWidgetsIcon.icon,
+				KeychainClient.swift,
+				KeychainConfig.swift,
+			);
+			target = 4AFE514F2EC914D600FCEC43 /* ChartWidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -25,8 +77,17 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				4AFE511A2EC8C59D00FCEC43 /* Exceptions for "GlassnodeWidgets" folder in "GlassnodeWidgets" target */,
+				4AFE516A2EC9159700FCEC43 /* Exceptions for "GlassnodeWidgets" folder in "ChartWidgetExtension" target */,
 			);
 			path = GlassnodeWidgets;
+			sourceTree = "<group>";
+		};
+		4AFE51562EC914D600FCEC43 /* ChartWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4AFE51672EC914D700FCEC43 /* Exceptions for "ChartWidget" folder in "ChartWidgetExtension" target */,
+			);
+			path = ChartWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -39,13 +100,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4AFE514D2EC914D600FCEC43 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4AFE51552EC914D600FCEC43 /* SwiftUI.framework in Frameworks */,
+				4AFE51532EC914D600FCEC43 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		4AFE51042EC8C59C00FCEC43 = {
 			isa = PBXGroup;
 			children = (
+				4AFE51682EC914FB00FCEC43 /* ChartWidgetExtension.entitlements */,
 				4AFE510F2EC8C59C00FCEC43 /* GlassnodeWidgets */,
+				4AFE51562EC914D600FCEC43 /* ChartWidget */,
+				4AFE51512EC914D600FCEC43 /* Frameworks */,
 				4AFE510E2EC8C59C00FCEC43 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,8 +127,18 @@
 			isa = PBXGroup;
 			children = (
 				4AFE510D2EC8C59C00FCEC43 /* GlassnodeWidgets.app */,
+				4AFE51502EC914D600FCEC43 /* ChartWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4AFE51512EC914D600FCEC43 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4AFE51522EC914D600FCEC43 /* WidgetKit.framework */,
+				4AFE51542EC914D600FCEC43 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -68,10 +151,12 @@
 				4AFE51092EC8C59C00FCEC43 /* Sources */,
 				4AFE510A2EC8C59C00FCEC43 /* Frameworks */,
 				4AFE510B2EC8C59C00FCEC43 /* Resources */,
+				4AFE51632EC914D700FCEC43 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4AFE51612EC914D700FCEC43 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4AFE510F2EC8C59C00FCEC43 /* GlassnodeWidgets */,
@@ -82,6 +167,28 @@
 			productName = GlassnodeWidgets;
 			productReference = 4AFE510D2EC8C59C00FCEC43 /* GlassnodeWidgets.app */;
 			productType = "com.apple.product-type.application";
+		};
+		4AFE514F2EC914D600FCEC43 /* ChartWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4AFE51662EC914D700FCEC43 /* Build configuration list for PBXNativeTarget "ChartWidgetExtension" */;
+			buildPhases = (
+				4AFE514C2EC914D600FCEC43 /* Sources */,
+				4AFE514D2EC914D600FCEC43 /* Frameworks */,
+				4AFE514E2EC914D600FCEC43 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4AFE51562EC914D600FCEC43 /* ChartWidget */,
+			);
+			name = ChartWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = ChartWidgetExtension;
+			productReference = 4AFE51502EC914D600FCEC43 /* ChartWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -94,6 +201,9 @@
 				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					4AFE510C2EC8C59C00FCEC43 = {
+						CreatedOnToolsVersion = 26.1.1;
+					};
+					4AFE514F2EC914D600FCEC43 = {
 						CreatedOnToolsVersion = 26.1.1;
 					};
 				};
@@ -113,12 +223,20 @@
 			projectRoot = "";
 			targets = (
 				4AFE510C2EC8C59C00FCEC43 /* GlassnodeWidgets */,
+				4AFE514F2EC914D600FCEC43 /* ChartWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4AFE510B2EC8C59C00FCEC43 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4AFE514E2EC914D600FCEC43 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -135,13 +253,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4AFE514C2EC914D600FCEC43 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4AFE51612EC914D700FCEC43 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4AFE514F2EC914D600FCEC43 /* ChartWidgetExtension */;
+			targetProxy = 4AFE51602EC914D700FCEC43 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4AFE511C2EC8C59D00FCEC43 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = GlassnodeWidgetsIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = GlassnodeWidgets/GlassnodeWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -153,6 +286,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GlassnodeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Glassnode Widgets";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -187,7 +321,7 @@
 		4AFE511D2EC8C59D00FCEC43 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = GlassnodeWidgetsIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = GlassnodeWidgets/GlassnodeWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -199,6 +333,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GlassnodeWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Glassnode Widgets";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -346,6 +481,94 @@
 			};
 			name = Release;
 		};
+		4AFE51642EC914D700FCEC43 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ChartWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 73N8SZQ662;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ChartWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ChartWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ondrejbarta.GlassnodeWidgets.ChartWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.1;
+			};
+			name = Debug;
+		};
+		4AFE51652EC914D700FCEC43 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ChartWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 73N8SZQ662;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ChartWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ChartWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ondrejbarta.GlassnodeWidgets.ChartWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -363,6 +586,15 @@
 			buildConfigurations = (
 				4AFE511C2EC8C59D00FCEC43 /* Debug */,
 				4AFE511D2EC8C59D00FCEC43 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4AFE51662EC914D700FCEC43 /* Build configuration list for PBXNativeTarget "ChartWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4AFE51642EC914D700FCEC43 /* Debug */,
+				4AFE51652EC914D700FCEC43 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

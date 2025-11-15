@@ -70,10 +70,11 @@ actor GlassnodeService {
         switch http.statusCode {
         case 200..<300:
             do {
-                return try await JSONDecoder.glassnode.decode(T.self, from: data)
+                return try JSONDecoder.glassnode().decode(T.self, from: data)
             } catch {
                 throw APIError.decoding(error)
             }
+        case 400: throw APIError.http(400)  // Bad request (invalid parameters)
         case 401: throw APIError.unauthorized
         case 429: throw APIError.rateLimited
         default: throw APIError.http(http.statusCode)
@@ -97,7 +98,7 @@ actor GlassnodeService {
 // MARK: - JSONDecoder helpers
 extension JSONDecoder {
     /// A decoder configured for typical Glassnode time series payloads.
-    static var glassnode: JSONDecoder {
+    nonisolated static func glassnode() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .secondsSince1970
         return d
@@ -114,14 +115,14 @@ struct TimeValue: Decodable, Identifiable {
 
 // MARK: - Endpoints
 enum GlassnodeEndpoint {
-    // Placeholder path for Relative Supply in Profit; please adjust to the exact Glassnode path.
-    // Example style: "/v1/metrics/indicators/supply_in_profit_relative"
+    // Percent Supply in Profit (profit_relative)
+    // Ref: https://docs.glassnode.com/basic-api/endpoints/supply
     case relativeSupplyInProfit(asset: String, interval: String)
 
     var path: String {
         switch self {
         case .relativeSupplyInProfit:
-            return "/v1/metrics/indicators/supply_in_profit_relative"
+            return "/v1/metrics/supply/profit_relative"
         }
     }
 
@@ -143,3 +144,4 @@ extension GlassnodeService {
         return try await get(endpoint.path, query: endpoint.defaultQuery, as: [TimeValue].self)
     }
 }
+

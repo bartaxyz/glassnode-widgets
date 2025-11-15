@@ -28,9 +28,7 @@ struct SettingsView: View {
                     ProgressView().controlSize(.small)
                     Text("Checking…")
                 } else if let isValid {
-                    Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.octagon.fill")
-                        .foregroundStyle(isValid ? .green : .red)
-                    Text(isValid ? "API key is valid" : "API key is invalid")
+                    Text(isValid ? "Your API key will be shared across devices connected to your Apple Account using secured Keychain Sharing" : "API key is invalid")
                 } else {
                     Text("Status unknown")
                 }
@@ -43,9 +41,10 @@ struct SettingsView: View {
                     HStack {
                         Button("Save") { saveKey() }
                             .buttonStyle(.borderedProminent)
+                            .disabled(isValidating || editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         Button("Cancel") { cancelEdit() }
                             .buttonStyle(.bordered)
-                            .disabled(existingKey == nil)
+                            .disabled(existingKey == nil || isValidating)
                     }
                 } else {
                     HStack {
@@ -106,16 +105,43 @@ struct SettingsView: View {
     private func saveKey() {
         let newKey = editingKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newKey.isEmpty else { self.errorMessage = "API key cannot be empty"; return }
-        do {
-            try keychain.saveAPIKey(newKey)
-            Task { await service.updateCachedAPIKey(newKey) }
-            existingKey = newKey
-            isEditing = false
-            editingKey = ""
-            errorMessage = nil
-            Task { await validate() }
-        } catch {
-            self.errorMessage = error.localizedDescription
+
+        // Validate first before saving
+        Task {
+            await MainActor.run {
+                isValidating = true
+                isValid = nil
+                errorMessage = nil
+            }
+
+            // Temporarily set the key for validation
+            await service.updateCachedAPIKey(newKey)
+            let ok = await service.validateAPIKey()
+
+            await MainActor.run {
+                isValidating = false
+                isValid = ok
+
+                if ok {
+                    // Key is valid - save it
+                    do {
+                        try keychain.saveAPIKey(newKey)
+                        existingKey = newKey
+                        isEditing = false
+                        editingKey = ""
+                        errorMessage = nil
+                    } catch {
+                        self.errorMessage = error.localizedDescription
+                        // Restore old key
+                        Task { await service.updateCachedAPIKey(existingKey) }
+                    }
+                } else {
+                    // Key is invalid - don't save
+                    errorMessage = "Invalid API key. Please check and try again."
+                    // Restore old key
+                    Task { await service.updateCachedAPIKey(existingKey) }
+                }
+            }
         }
     }
 

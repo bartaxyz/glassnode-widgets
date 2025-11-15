@@ -34,10 +34,15 @@ struct KeychainClient {
             kSecAttrAccount as String: KeychainConfig.account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+            kSecAttrSynchronizable as String: true  // Look for synchronizable item
         ]
+
         if let accessGroup = KeychainConfig.accessGroup {
             query[kSecAttrAccessGroup as String] = accessGroup
+            #if os(macOS)
+            // On macOS, kSecUseDataProtectionKeychain is required when using kSecAttrAccessGroup with kSecAttrSynchronizable
+            query[kSecUseDataProtectionKeychain as String] = true
+            #endif
         }
 
         var result: CFTypeRef?
@@ -57,10 +62,15 @@ struct KeychainClient {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: KeychainConfig.service,
             kSecAttrAccount as String: KeychainConfig.account,
-            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+            kSecAttrSynchronizable as String: true  // Query for synchronizable item
         ]
+
         if let accessGroup = KeychainConfig.accessGroup {
             updateQuery[kSecAttrAccessGroup as String] = accessGroup
+            #if os(macOS)
+            // On macOS, kSecUseDataProtectionKeychain is required when using kSecAttrAccessGroup with kSecAttrSynchronizable
+            updateQuery[kSecUseDataProtectionKeychain as String] = true
+            #endif
         }
 
         let attributesToUpdate: [String: Any] = [
@@ -73,17 +83,22 @@ struct KeychainClient {
             throw KeychainError.unhandledStatus(status)
         }
 
-        // Add new
+        // Add new - with both access group and synchronizable for sharing + iCloud sync
         var addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: KeychainConfig.service,
             kSecAttrAccount as String: KeychainConfig.account,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
-            kSecAttrSynchronizable as String: kCFBooleanTrue as Any,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,  // Allows widget access when locked
+            kSecAttrSynchronizable as String: true,  // Enable iCloud Keychain sync
             kSecValueData as String: key.data(using: .utf8) as Any
         ]
+
         if let accessGroup = KeychainConfig.accessGroup {
             addQuery[kSecAttrAccessGroup as String] = accessGroup
+            #if os(macOS)
+            // On macOS, kSecUseDataProtectionKeychain is required when using kSecAttrAccessGroup with kSecAttrSynchronizable
+            addQuery[kSecUseDataProtectionKeychain as String] = true
+            #endif
         }
 
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
@@ -96,10 +111,15 @@ struct KeychainClient {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: KeychainConfig.service,
             kSecAttrAccount as String: KeychainConfig.account,
-            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny
+            kSecAttrSynchronizable as String: true  // Query for synchronizable item
         ]
+
         if let accessGroup = KeychainConfig.accessGroup {
             query[kSecAttrAccessGroup as String] = accessGroup
+            #if os(macOS)
+            // On macOS, kSecUseDataProtectionKeychain is required when using kSecAttrAccessGroup with kSecAttrSynchronizable
+            query[kSecUseDataProtectionKeychain as String] = true
+            #endif
         }
 
         let status = SecItemDelete(query as CFDictionary)

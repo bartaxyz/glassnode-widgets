@@ -15,11 +15,9 @@ enum KeychainConfig {
     /// The account name for the API key item.
     static let account: String = "apiKey"
 
-    /// Optional Keychain access group. Provide this if you want to share the key
-    /// with extensions/widgets via Keychain Sharing. Leave `nil` to use the app's default keychain.
-    /// Example value: "ABCD1234.com.your.bundleid.keychain"
-    ///
-    /// Note: You mentioned Keychain Sharing is enabled already. If you want to share the key,
-    /// set this to your actual access group string from your entitlements.
+    /// Keychain access group for sharing between app and widget extension.
+    /// When using kSecAttrSynchronizable, we don't specify an access group explicitly.
+    /// The system automatically uses the first keychain-access-groups value from entitlements,
+    /// which is shared between the app and widget extension.
     static let accessGroup: String? = nil
 }

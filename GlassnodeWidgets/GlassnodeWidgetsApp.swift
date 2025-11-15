@@ -15,12 +15,18 @@ struct GlassnodeWidgetsApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SettingsView()
-                .navigationTitle("Glassnode Widgets")
-                .environment(\.glassnodeService, glassnodeService)
-                .frame(width: 480, height: 280)
+            NavigationStack {
+                SettingsView()
+                    .navigationTitle("Glassnode Widgets")
+                    .environment(\.glassnodeService, glassnodeService)
+#if os(macOS)
+                    .frame(width: 480, height: 280)
+#endif
+            }
         }
+#if os(macOS)
         .windowResizability(.contentSize)
         .defaultSize(width: 480, height: 280)
+#endif
     }
 }
