@@ -115,20 +115,19 @@ struct TimeValue: Decodable, Identifiable {
 
 // MARK: - Endpoints
 enum GlassnodeEndpoint {
-    // Percent Supply in Profit (profit_relative)
-    // Ref: https://docs.glassnode.com/basic-api/endpoints/supply
-    case relativeSupplyInProfit(asset: String, interval: String)
+    // Generic metric endpoint
+    case metric(path: String, asset: String, interval: String)
 
     var path: String {
         switch self {
-        case .relativeSupplyInProfit:
-            return "/v1/metrics/supply/profit_relative"
+        case .metric(let metricPath, _, _):
+            return metricPath
         }
     }
 
     var defaultQuery: [URLQueryItem] {
         switch self {
-        case let .relativeSupplyInProfit(asset, interval):
+        case let .metric(_, asset, interval):
             return [
                 URLQueryItem(name: "a", value: asset),
                 URLQueryItem(name: "i", value: interval)
@@ -138,10 +137,22 @@ enum GlassnodeEndpoint {
 }
 
 extension GlassnodeService {
-    // Typed helper for Relative Supply in Profit
-    func fetchRelativeSupplyInProfit(asset: String = "BTC", interval: String = "24h") async throws -> [TimeValue] {
-        let endpoint = GlassnodeEndpoint.relativeSupplyInProfit(asset: asset, interval: interval)
+    /// Fetch any metric by path
+    /// - Parameters:
+    ///   - metricPath: The metric path (e.g., "/v1/metrics/market/price_usd_close")
+    ///   - asset: Asset symbol (default: "BTC")
+    ///   - interval: Data interval (default: "24h")
+    /// - Returns: Array of time-value pairs
+    func fetchMetric(path metricPath: String, asset: String = "BTC", interval: String = "24h") async throws -> [TimeValue] {
+        let endpoint = GlassnodeEndpoint.metric(path: metricPath, asset: asset, interval: interval)
         return try await get(endpoint.path, query: endpoint.defaultQuery, as: [TimeValue].self)
+    }
+
+    // MARK: - Backwards Compatibility
+
+    /// Typed helper for Relative Supply in Profit (backwards compatibility)
+    func fetchRelativeSupplyInProfit(asset: String = "BTC", interval: String = "24h") async throws -> [TimeValue] {
+        return try await fetchMetric(path: "/v1/metrics/supply/profit_relative", asset: asset, interval: interval)
     }
 }
 
