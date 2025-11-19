@@ -27,23 +27,27 @@ struct WidgetDataFetcher {
         }
     }
 
-    static func fetchData() async throws -> [TimeValue] {
+    static func fetchData(metricId: String = "supply/profit_relative", timeRange: String = "24h") async throws -> [TimeValue] {
         // Read API key from keychain
         let keychain = KeychainClient()
         guard let apiKey = try keychain.readAPIKey(), !apiKey.isEmpty else {
             throw FetchError.missingAPIKey
         }
 
-        // Calculate timestamp for 24 hours ago to limit data returned by API
+        // Get interval from metric config
+        let interval = WidgetMetricConfig.config(for: metricId).interval
+
+        // Always fetch last 24 hours
         let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
         let sinceTimestamp = String(Int(oneDayAgo.timeIntervalSince1970))
 
-        // Build URL with 'since' parameter to fetch only last 24 hours from API
-        var components = URLComponents(string: "https://api.glassnode.com/v1/metrics/supply/profit_relative")!
+        // Build URL with metric path
+        let metricPath = "/v1/metrics/\(metricId)"
+        var components = URLComponents(string: "https://api.glassnode.com\(metricPath)")!
         components.queryItems = [
             URLQueryItem(name: "a", value: "BTC"),
-            URLQueryItem(name: "i", value: "1h"),
-            URLQueryItem(name: "s", value: sinceTimestamp),  // Only fetch last 24h
+            URLQueryItem(name: "i", value: interval),
+            URLQueryItem(name: "s", value: sinceTimestamp),
             URLQueryItem(name: "api_key", value: apiKey)
         ]
 
@@ -69,7 +73,7 @@ struct WidgetDataFetcher {
             throw FetchError.httpError(http.statusCode)
         }
 
-        // Decode - only 24 data points
+        // Decode
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
 
@@ -77,8 +81,24 @@ struct WidgetDataFetcher {
             throw FetchError.decodingError
         }
 
-        // Limit to maximum 24 points to ensure we don't exceed memory
-        let limitedResult = Array(result.suffix(24))
+        // Filter based on time range
+        let filteredResult: [TimeValue]
+        if timeRange == "today" {
+            // Get midnight of current day in local timezone, minus 30 minute margin
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            let todayWithMargin = today.addingTimeInterval(-30 * 60)  // 30 minutes before midnight
+            // Filter to include data points from 30 minutes before midnight onwards
+            filteredResult = result.filter { $0.t >= todayWithMargin }
+        } else {
+            // Use all 24h data
+            filteredResult = result
+        }
+
+        // Limit based on interval to ensure we don't exceed memory
+        // 10m interval: max 144 points (24h), 1h interval: max 24 points (24h)
+        let maxPoints = interval == "10m" ? 144 : 24
+        let limitedResult = Array(filteredResult.suffix(maxPoints))
 
         return limitedResult
     }
@@ -86,23 +106,26 @@ struct WidgetDataFetcher {
 
 struct Provider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), data: Self.placeholderData, error: nil)
+        SimpleEntry(date: Date(), metricId: "supply/profit_relative", data: Self.placeholderData, error: nil, timeRange: "24h")
     }
 
     func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> SimpleEntry {
         // For snapshots, return placeholder data quickly
-        return SimpleEntry(date: Date(), data: Self.placeholderData, error: nil)
+        let metricId = configuration.metricId?.id ?? "supply/profit_relative"
+        let timeRange = configuration.timeRange?.id ?? "24h"
+        return SimpleEntry(date: Date(), metricId: metricId, data: Self.placeholderData, error: nil, timeRange: timeRange)
     }
 
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<SimpleEntry> {
         let currentDate = Date()
+        let metricId = configuration.metricId?.id ?? "supply/profit_relative"
+        let timeRange = configuration.timeRange?.id ?? "24h"
 
         do {
             // Use lightweight fetcher that doesn't create actors or retain sessions
-            // Data is already filtered to last 24h by the API, no need to filter again
-            let data = try await WidgetDataFetcher.fetchData()
+            let data = try await WidgetDataFetcher.fetchData(metricId: metricId, timeRange: timeRange)
 
-            let entry = SimpleEntry(date: currentDate, data: data, error: nil)
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: data, error: nil, timeRange: timeRange)
 
             // Update every 15 minutes
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate)!
@@ -110,20 +133,20 @@ struct Provider: AppIntentTimelineProvider {
 
         } catch WidgetDataFetcher.FetchError.missingAPIKey {
             // No API key configured
-            let entry = SimpleEntry(date: currentDate, data: [], error: "No API key configured. Please open the app and enter your Glassnode API key.")
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "No API key configured. Please open the app and enter your Glassnode API key.", timeRange: timeRange)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
 
         } catch WidgetDataFetcher.FetchError.httpError(401) {
             // Invalid API key
-            let entry = SimpleEntry(date: currentDate, data: [], error: "Invalid API key. Please check your key in the app.")
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "Invalid API key. Please check your key in the app.", timeRange: timeRange)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
 
         } catch {
             // Other errors
             let errorMsg = "Error: \(error.localizedDescription)"
-            let entry = SimpleEntry(date: currentDate, data: [], error: errorMsg)
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: errorMsg, timeRange: timeRange)
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
         }
@@ -153,13 +176,19 @@ struct Provider: AppIntentTimelineProvider {
 
 struct SimpleEntry: TimelineEntry {
     let date: Date
+    let metricId: String
     let data: [TimeValue]
     let error: String?
+    let timeRange: String
 }
 
 struct ChartWidgetEntryView : View {
     var entry: Provider.Entry
     @Environment(\.widgetFamily) var family
+
+    private var timeRangeLabel: String {
+        entry.timeRange == "today" ? "Today" : "24h"
+    }
 
     var body: some View {
         if let error = entry.error {
@@ -170,13 +199,13 @@ struct ChartWidgetEntryView : View {
             // Use different views for lock screen vs home screen
             switch family {
             case .accessoryCircular:
-                LockScreenCircularView(data: entry.data)
+                LockScreenCircularView(data: entry.data, metricId: entry.metricId)
             case .accessoryRectangular:
-                LockScreenRectangularView(data: entry.data)
+                LockScreenRectangularView(data: entry.data, metricId: entry.metricId, timeRange: entry.timeRange)
             case .accessoryInline:
-                LockScreenInlineView(data: entry.data)
+                LockScreenInlineView(data: entry.data, metricId: entry.metricId)
             default:
-                ChartView(data: entry.data, family: family)
+                ChartView(data: entry.data, metricId: entry.metricId, family: family, timeRangeLabel: timeRangeLabel, timeRange: entry.timeRange)
             }
         }
     }
@@ -184,11 +213,18 @@ struct ChartWidgetEntryView : View {
 
 struct ChartView: View {
     let data: [TimeValue]
+    let metricId: String
     let family: WidgetFamily
+    let timeRangeLabel: String
+    let timeRange: String
     let asset: String = "BTC"  // Default to BTC for now
 
+    private var metricConfig: WidgetMetricConfig {
+        WidgetMetricConfig.config(for: metricId)
+    }
+
     private var currentValue: Double {
-        data.first?.v ?? 0
+        data.last?.v ?? 0
     }
 
     private var percentChange: Double {
@@ -200,52 +236,48 @@ struct ChartView: View {
         percentChange >= 0
     }
 
-    // Asset-specific colors
+    // Metric-specific colors
     private var assetColors: (primary: Color, secondary: Color) {
-        switch asset {
-        case "BTC":
-            return (.orange, .yellow)
-        case "ETH":
-            return (.purple, .blue)
-        default:
-            return (.blue, .cyan)
-        }
+        (metricConfig.primaryColor, metricConfig.secondaryColor)
     }
 
     // Calculate chart Y domain with padding
     private var chartYDomain: ClosedRange<Double> {
-        guard !data.isEmpty else { return 0...1 }
         let values = data.map { $0.v }
-        let minValue = values.min() ?? 0
-        let maxValue = values.max() ?? 1
-        let range = maxValue - minValue
-        let padding = range * 0.15  // 15% padding on each side
-        return (minValue - padding)...(maxValue + padding)
+        return metricConfig.calculateRange(for: values)
+    }
+
+    // Calculate chart X domain for today mode (midnight to midnight)
+    private var todayXDomain: ClosedRange<Date> {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        return startOfDay...endOfDay
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("BTC: % Supply in Profit")
+                Text("BTC: \(metricConfig.shortName)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("24h")
+                Text(timeRangeLabel)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
 
             // Current value & change
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(formatPercent(currentValue))
+                Text(metricConfig.formatValue(currentValue))
                     .font(.system(.title2, design: .rounded))
                     .fontWeight(.semibold)
 
-                HStack(spacing: 2) {
+                HStack(spacing: 0) {
                     Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
                         .font(.caption2)
-                    Text(formatChange(percentChange))
+                    Text(metricConfig.formatChange(percentChange))
                         .font(.caption)
                 }
                 .foregroundStyle(isPositive ? .green : .red)
@@ -255,16 +287,17 @@ struct ChartView: View {
             let sortedData = data.sorted(by: { $0.t < $1.t })
 
             Chart {
-                // Guide lines first (drawn once, not per data point!)
-                if chartYDomain.contains(0.5) {
-                    RuleMark(y: .value("Bottom", 0.5))
-                        .foregroundStyle(.green.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                // Baseline at starting value
+                if let startingValue = sortedData.first?.v {
+                    RuleMark(y: .value("Baseline", startingValue))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
                 }
 
-                if chartYDomain.contains(0.95) {
-                    RuleMark(y: .value("Top", 0.95))
-                        .foregroundStyle(.red.opacity(0.3))
+                // Add a neutral line at 1.0 for SOPR (spent output profit ratio)
+                if metricId == "indicators/sopr" && chartYDomain.contains(1.0) {
+                    RuleMark(y: .value("Break-even", 1.0))
+                        .foregroundStyle(.gray.opacity(0.5))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 }
 
@@ -315,7 +348,7 @@ struct ChartView: View {
                         .foregroundStyle(.tertiary.opacity(0.3))
                     AxisValueLabel {
                         if let doubleValue = value.as(Double.self) {
-                            Text(formatPercent(doubleValue))
+                            Text(metricConfig.formatValue(doubleValue))
                                 .font(.system(size: 8))
                                 .foregroundStyle(.secondary)
                         }
@@ -323,47 +356,91 @@ struct ChartView: View {
                 }
             }
             .chartYScale(domain: chartYDomain)
+            .modifier(XScaleModifier(timeRange: timeRange, domain: todayXDomain))
         }
     }
+}
 
-    private func formatPercent(_ value: Double) -> String {
-        String(format: "%.1f%%", value * 100)
-    }
+// Conditional X-scale modifier
+struct XScaleModifier: ViewModifier {
+    let timeRange: String
+    let domain: ClosedRange<Date>
 
-    private func formatChange(_ value: Double) -> String {
-        String(format: "%.2f%%", abs(value))
+    func body(content: Content) -> some View {
+        if timeRange == "today" {
+            content.chartXScale(domain: domain)
+        } else {
+            content
+        }
     }
 }
 
 // Lock Screen Widgets
 struct LockScreenCircularView: View {
     let data: [TimeValue]
+    let metricId: String
+
+    private var metricConfig: WidgetMetricConfig {
+        WidgetMetricConfig.config(for: metricId)
+    }
 
     private var currentValue: Double {
-        data.first?.v ?? 0
+        data.last?.v ?? 0
     }
 
     var body: some View {
         ZStack {
             AccessoryWidgetBackground()
             VStack(spacing: 2) {
-                Text("\(Int(currentValue * 100))%")
+                Text(formatValueCompact(currentValue))
                     .font(.system(.body, design: .rounded))
                     .fontWeight(.semibold)
-                Text("SIP")
+                Text(metricConfig.shortName)
                     .font(.system(size: 8))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
+    }
+
+    private func formatValueCompact(_ value: Double) -> String {
+        if metricConfig.isPercentage {
+            return "\(Int(value * 100))%"
+        }
+        if metricId.contains("price") {
+            if value >= 1_000_000 {
+                return String(format: "$%.1fM", value / 1_000_000)
+            } else if value >= 1_000 {
+                return String(format: "$%.1fK", value / 1_000)
+            }
+            return String(format: "$%.0f", value)
+        }
+        if value >= 1_000_000 {
+            return String(format: "%.1fM", value / 1_000_000)
+        } else if value >= 1_000 {
+            return String(format: "%.1fK", value / 1_000)
+        }
+        return String(format: "%.1f", value)
     }
 }
 
 struct LockScreenRectangularView: View {
     let data: [TimeValue]
+    let metricId: String
+    let timeRange: String
     let asset: String = "BTC"  // Default to BTC for now
 
+    private var metricConfig: WidgetMetricConfig {
+        WidgetMetricConfig.config(for: metricId)
+    }
+
+    private var deltaValue: Double {
+        guard let first = data.first?.v, let last = data.last?.v else { return 0 }
+        return last - first
+    }
+
     private var currentValue: Double {
-        data.first?.v ?? 0
+        data.last?.v ?? 0
     }
 
     private var percentChange: Double {
@@ -375,36 +452,49 @@ struct LockScreenRectangularView: View {
         percentChange >= 0
     }
 
-    // Asset-specific colors
+    // Metric-specific colors
     private var assetColors: (primary: Color, secondary: Color) {
-        switch asset {
-        case "BTC":
-            return (.orange, .yellow)
-        case "ETH":
-            return (.purple, .blue)
-        default:
-            return (.blue, .cyan)
-        }
+        (metricConfig.primaryColor, metricConfig.secondaryColor)
     }
 
     // Calculate chart Y domain with padding to zoom into data range
     private var chartYDomain: ClosedRange<Double> {
-        guard !data.isEmpty else { return 0...1 }
         let values = data.map { $0.v }
-        let minValue = values.min() ?? 0
-        let maxValue = values.max() ?? 1
-        let range = maxValue - minValue
-        let padding = range * 0.15  // 15% padding on each side
-        return (minValue - padding)...(maxValue + padding)
+        return metricConfig.calculateRange(for: values)
+    }
+
+    // Calculate chart X domain for today mode (midnight to midnight)
+    private var todayXDomain: ClosedRange<Date> {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        return startOfDay...endOfDay
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             // Title
-            Text("\(asset): \(String(format: "%.1f%%", currentValue * 100)) in profit")
-                .font(.body)
-                .fontWeight(.semibold)
-                // .font(.system(size: 14, weight: .semibold))
+            HStack {
+                Text("\(asset): \(metricConfig.shortName)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                    .opacity(0.5)
+            }
+            
+            HStack(spacing: 2) {
+                Text("\(metricConfig.formatValue(currentValue))")
+                    .font(.body)
+                    .fontWeight(.semibold)
+                Spacer()
+                Image(systemName: deltaValue > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                    .opacity(0.5)
+                    .font(.system(size: 8))
+                Text("\(metricConfig.formatValue(deltaValue))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .opacity(0.5)
+            }
 
             // Delta
             /*
@@ -419,37 +509,47 @@ struct LockScreenRectangularView: View {
 
             // Chart with gradient
             let sortedData = data.sorted(by: { $0.t < $1.t })
-            Chart(sortedData) { item in
-                // Area gradient
-                AreaMark(
-                    x: .value("Time", item.t),
-                    yStart: .value("Baseline", chartYDomain.lowerBound),
-                    yEnd: .value("Value", item.v)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        stops: [
-                            .init(color: assetColors.primary.opacity(0.4), location: 0),
-                            .init(color: assetColors.primary.opacity(0), location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            Chart {
+                // Baseline at starting value
+                if let startingValue = sortedData.first?.v {
+                    RuleMark(y: .value("Baseline", startingValue))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                }
 
-                // Line
-                LineMark(
-                    x: .value("Time", item.t),
-                    y: .value("Value", item.v)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(assetColors.primary)
-                .lineStyle(StrokeStyle(lineWidth: 1.5))
+                ForEach(sortedData) { item in
+                    // Area gradient
+                    AreaMark(
+                        x: .value("Time", item.t),
+                        yStart: .value("Baseline", chartYDomain.lowerBound),
+                        yEnd: .value("Value", item.v)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(
+                        LinearGradient(
+                            stops: [
+                                .init(color: assetColors.primary.opacity(0.4), location: 0),
+                                .init(color: assetColors.primary.opacity(0), location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                    // Line
+                    LineMark(
+                        x: .value("Time", item.t),
+                        y: .value("Value", item.v)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(assetColors.primary)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+                }
             }
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)
             .chartYScale(domain: chartYDomain)
+            .modifier(XScaleModifier(timeRange: timeRange, domain: todayXDomain))
             .frame(height: 30)
         }
     }
@@ -457,13 +557,18 @@ struct LockScreenRectangularView: View {
 
 struct LockScreenInlineView: View {
     let data: [TimeValue]
+    let metricId: String
+
+    private var metricConfig: WidgetMetricConfig {
+        WidgetMetricConfig.config(for: metricId)
+    }
 
     private var currentValue: Double {
-        data.first?.v ?? 0
+        data.last?.v ?? 0
     }
 
     var body: some View {
-        Text("BTC: \(String(format: "%.1f%%", currentValue * 100)) in profit")
+        Text("BTC: \(metricConfig.formatValue(currentValue)) \(metricConfig.shortName)")
     }
 }
 
@@ -500,8 +605,8 @@ struct ChartWidget: Widget {
             ChartWidgetEntryView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("Supply in Profit")
-        .description("Shows Bitcoin's percent supply in profit over the last 24 hours.")
+        .configurationDisplayName("Glassnode Metrics")
+        .description("Track Bitcoin metrics from Glassnode over the last 24 hours.")
         .supportedFamilies([
             .systemSmall,
             .systemMedium,
@@ -517,41 +622,41 @@ struct ChartWidget: Widget {
 #Preview(as: .systemSmall) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
 #Preview(as: .systemMedium) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
 #Preview(as: .systemLarge) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
 #Preview(as: .systemExtraLarge) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
 #Preview(as: .accessoryCircular) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
 #Preview(as: .accessoryRectangular) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
 #Preview(as: .accessoryInline) {
     ChartWidget()
 } timeline: {
-    SimpleEntry(date: .now, data: Provider.placeholderData, error: nil)
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
