@@ -16,6 +16,7 @@ struct MetricConfig: Identifiable, Codable {
     let unit: MetricUnit        // Unit type
     let visualRange: VisualRange // Visualization range
     let color: MetricColor      // Primary color for the metric
+    let interval: String        // API interval (e.g., "10m", "1h", "24h")
 
     /// API path for this metric
     var apiPath: String {
@@ -127,7 +128,7 @@ extension MetricConfig {
         .hashRate,
         .supplyActive1Year,
         .sopr,
-        .fearGreed
+        .nupl
     ]
 
     /// Price (USD)
@@ -137,7 +138,8 @@ extension MetricConfig {
         shortName: "Price",
         unit: .usd,
         visualRange: .dynamic(padding: 0.1),
-        color: .orange
+        color: .orange,
+        interval: "10m"
     )
 
     /// Market Capitalization (USD)
@@ -147,7 +149,8 @@ extension MetricConfig {
         shortName: "Market Cap",
         unit: .usd,
         visualRange: .dynamic(padding: 0.1),
-        color: .blue
+        color: .blue,
+        interval: "10m"
     )
 
     /// Percent Supply in Profit
@@ -156,8 +159,9 @@ extension MetricConfig {
         name: "Percent Supply in Profit",
         shortName: "Supply in Profit",
         unit: .percentage,
-        visualRange: .fixed(min: 0, max: 1),
-        color: .green
+        visualRange: .dynamic(padding: 0.15),
+        color: .green,
+        interval: "1h"
     )
 
     /// Active Addresses
@@ -167,7 +171,8 @@ extension MetricConfig {
         shortName: "Active Addresses",
         unit: .count,
         visualRange: .dynamic(padding: 0.15),
-        color: .blue
+        color: .blue,
+        interval: "1h"
     )
 
     /// Transaction Count
@@ -177,7 +182,8 @@ extension MetricConfig {
         shortName: "Transactions",
         unit: .count,
         visualRange: .dynamic(padding: 0.15),
-        color: .purple
+        color: .purple,
+        interval: "10m"
     )
 
     /// MVRV Ratio
@@ -187,7 +193,8 @@ extension MetricConfig {
         shortName: "MVRV",
         unit: .ratio,
         visualRange: .dynamic(padding: 0.15),
-        color: .orange
+        color: .orange,
+        interval: "1h"
     )
 
     /// Hash Rate
@@ -197,7 +204,8 @@ extension MetricConfig {
         shortName: "Hash Rate",
         unit: .hashRate,
         visualRange: .dynamic(padding: 0.1),
-        color: .green
+        color: .green,
+        interval: "1h"
     )
 
     /// Supply Last Active 1+ Years Ago
@@ -206,8 +214,9 @@ extension MetricConfig {
         name: "Supply Last Active 1+ Years",
         shortName: "1Y+ Supply",
         unit: .percentage,
-        visualRange: .fixed(min: 0, max: 1),
-        color: .blue
+        visualRange: .dynamic(padding: 0.15),
+        color: .blue,
+        interval: "1h"
     )
 
     /// SOPR (Spent Output Profit Ratio)
@@ -217,17 +226,19 @@ extension MetricConfig {
         shortName: "SOPR",
         unit: .ratio,
         visualRange: .dynamic(padding: 0.15),
-        color: .purple
+        color: .purple,
+        interval: "1h"
     )
 
-    /// Fear & Greed Index
-    static let fearGreed = MetricConfig(
-        id: "indicators/fear_greed",
-        name: "Fear & Greed Index",
-        shortName: "Fear & Greed",
-        unit: .percentage,
-        visualRange: .fixed(min: 0, max: 1),
-        color: .orange
+    /// NUPL (Net Unrealized Profit/Loss)
+    static let nupl = MetricConfig(
+        id: "indicators/net_unrealized_profit_loss",
+        name: "Net Unrealized Profit/Loss",
+        shortName: "NUPL",
+        unit: .ratio,
+        visualRange: .dynamic(padding: 0.15),
+        color: .orange,
+        interval: "1h"
     )
 
     /// Get metric by ID

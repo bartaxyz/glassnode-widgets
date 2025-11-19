@@ -19,6 +19,7 @@ struct WidgetMetricConfig {
     let maxValue: Double
     let primaryColor: Color
     let secondaryColor: Color
+    let interval: String
 
     func formatValue(_ value: Double) -> String {
         if isPercentage {
@@ -99,7 +100,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .orange,
-                secondaryColor: .yellow
+                secondaryColor: .yellow,
+                interval: "10m"
             )
 
         case "market/marketcap_usd":
@@ -112,7 +114,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .blue,
-                secondaryColor: .cyan
+                secondaryColor: .cyan,
+                interval: "10m"
             )
 
         case "supply/profit_relative":
@@ -121,11 +124,12 @@ struct WidgetMetricConfig {
                 name: "Percent Supply in Profit",
                 shortName: "Supply in Profit",
                 isPercentage: true,
-                hasFixedRange: true,
+                hasFixedRange: false,
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .green,
-                secondaryColor: .mint
+                secondaryColor: .mint,
+                interval: "1h"
             )
 
         case "addresses/active_count":
@@ -138,7 +142,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .blue,
-                secondaryColor: .cyan
+                secondaryColor: .cyan,
+                interval: "1h"
             )
 
         case "transactions/count":
@@ -151,7 +156,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .purple,
-                secondaryColor: .indigo
+                secondaryColor: .indigo,
+                interval: "10m"
             )
 
         case "market/mvrv":
@@ -164,7 +170,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .orange,
-                secondaryColor: .yellow
+                secondaryColor: .yellow,
+                interval: "1h"
             )
 
         case "mining/hash_rate_mean":
@@ -177,7 +184,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .green,
-                secondaryColor: .mint
+                secondaryColor: .mint,
+                interval: "1h"
             )
 
         case "supply/active_more_1y_percent":
@@ -186,11 +194,12 @@ struct WidgetMetricConfig {
                 name: "Supply Last Active 1+ Years",
                 shortName: "1Y+ Supply",
                 isPercentage: true,
-                hasFixedRange: true,
+                hasFixedRange: false,
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .blue,
-                secondaryColor: .cyan
+                secondaryColor: .cyan,
+                interval: "1h"
             )
 
         case "indicators/sopr":
@@ -203,20 +212,22 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .purple,
-                secondaryColor: .indigo
+                secondaryColor: .indigo,
+                interval: "1h"
             )
 
-        case "indicators/fear_greed":
+        case "indicators/net_unrealized_profit_loss":
             return WidgetMetricConfig(
                 id: metricId,
-                name: "Fear & Greed Index",
-                shortName: "Fear & Greed",
-                isPercentage: true,
-                hasFixedRange: true,
+                name: "Net Unrealized Profit/Loss",
+                shortName: "NUPL",
+                isPercentage: false,
+                hasFixedRange: false,
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .orange,
-                secondaryColor: .yellow
+                secondaryColor: .yellow,
+                interval: "1h"
             )
 
         default:
@@ -230,7 +241,8 @@ struct WidgetMetricConfig {
                 minValue: 0,
                 maxValue: 1,
                 primaryColor: .blue,
-                secondaryColor: .cyan
+                secondaryColor: .cyan,
+                interval: "1h"
             )
         }
     }
