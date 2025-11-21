@@ -1,8 +1,8 @@
 //
-//  SettingsView.swift
+//  SwiftUIView.swift
 //  GlassnodeWidgets
 //
-//  Created by Assistant on 15/11/25.
+//  Created by Ondřej Bárta on 20/11/25.
 //
 
 import SwiftUI
@@ -19,7 +19,7 @@ struct SettingsView: View {
     @State private var isValidating: Bool = false
     @State private var isValid: Bool? = nil
     @State private var errorMessage: String? = nil
-
+    
     var body: some View {
         Form {
             Section(header: Text("Glassnode API Key"), footer:
@@ -48,7 +48,7 @@ struct SettingsView: View {
                     }
                 } else {
                     HStack {
-                        Text(anonymizedKey(existingKey ?? ""))
+                        Text(KeychainClient.anonymizedKey(existingKey ?? ""))
                             .font(.body.monospaced())
                             .textSelection(.disabled)
                         Spacer()
@@ -59,20 +59,20 @@ struct SettingsView: View {
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }
         }
-        .formStyle(.grouped)
-        .padding()
-        .toolbar() {
-            ToolbarItem {
-                Button("Get API Key", systemImage: "key.horizontal") {
-                    //
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Confirm", systemImage: "checkmark") {
+                    dismiss()
                 }
-                .labelStyle(.titleAndIcon)
+                .disabled(existingKey == nil)
             }
         }
-        .toolbarTitleDisplayMode(.inline)
-        .task { await loadExistingKeyAndValidate() }
+        .task {
+            await loadExistingKeyAndValidate()
+        }
     }
-
+    
+    
     private func loadExistingKeyAndValidate() async {
         do {
             let key = try keychain.readAPIKey()
@@ -167,5 +167,4 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
-        .environment(\.glassnodeService, GlassnodeService())
 }

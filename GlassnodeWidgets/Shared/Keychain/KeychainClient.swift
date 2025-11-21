@@ -7,8 +7,11 @@
 
 import Foundation
 import Security
+internal import Combine
 
-struct KeychainClient {
+final class KeychainClient: ObservableObject {
+    @Published var lastUpdated: Date = Date()
+
     enum KeychainError: Error, LocalizedError {
         case unhandledStatus(OSStatus)
         case invalidItemFormat
@@ -74,7 +77,8 @@ struct KeychainClient {
         }
 
         let attributesToUpdate: [String: Any] = [
-            kSecValueData as String: key.data(using: .utf8) as Any
+            kSecValueData as String: key.data(using: .utf8) as Any,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock  // Update accessibility for existing keys
         ]
 
         let status = SecItemUpdate(updateQuery as CFDictionary, attributesToUpdate as CFDictionary)
@@ -125,6 +129,28 @@ struct KeychainClient {
         let status = SecItemDelete(query as CFDictionary)
         if status == errSecItemNotFound { return }
         guard status == errSecSuccess else { throw KeychainError.unhandledStatus(status) }
+    }
+
+    // MARK: - Migration
+    /// Migrate existing API key to use kSecAttrAccessibleAfterFirstUnlock
+    /// This should be called once when the app launches to ensure widgets can access the key when locked
+    func migrateAPIKeyAccessibility() throws {
+        // Try to read the existing key
+        guard let existingKey = try readAPIKey() else {
+            // No key to migrate
+            return
+        }
+
+        // Re-save the key, which will update it with the new accessibility setting
+        try saveAPIKey(existingKey)
+    }
+
+    // MARK: - Anonimized Key
+    static func anonymizedKey(_ key: String) -> String {
+        guard key.count > 10 else { return String(repeating: "•", count: max(4, key.count)) }
+        let prefix = key.prefix(4)
+        let suffix = key.suffix(4)
+        return "\(prefix)••••••••\(suffix)"
     }
 }
 

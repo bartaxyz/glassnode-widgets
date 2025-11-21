@@ -9,98 +9,21 @@ import WidgetKit
 import SwiftUI
 import Charts
 
-// Lightweight, non-actor based fetcher for widgets to avoid memory leaks
+// Widget-specific wrapper for MetricDataFetcher
 struct WidgetDataFetcher {
-    enum FetchError: Error, LocalizedError {
-        case missingAPIKey
-        case invalidURL
-        case httpError(Int)
-        case decodingError
-
-        var errorDescription: String? {
-            switch self {
-            case .missingAPIKey: return "No API key configured"
-            case .invalidURL: return "Invalid URL"
-            case .httpError(let code): return "HTTP error: \(code)"
-            case .decodingError: return "Failed to decode response"
-            }
-        }
-    }
-
     static func fetchData(metricId: String = "supply/profit_relative", timeRange: String = "24h") async throws -> [TimeValue] {
         // Read API key from keychain
         let keychain = KeychainClient()
         guard let apiKey = try keychain.readAPIKey(), !apiKey.isEmpty else {
-            throw FetchError.missingAPIKey
+            throw MetricDataFetcher.FetchError.missingAPIKey
         }
 
-        // Get interval from metric config
-        let interval = WidgetMetricConfig.config(for: metricId).interval
-
-        // Always fetch last 24 hours
-        let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
-        let sinceTimestamp = String(Int(oneDayAgo.timeIntervalSince1970))
-
-        // Build URL with metric path
-        let metricPath = "/v1/metrics/\(metricId)"
-        var components = URLComponents(string: "https://api.glassnode.com\(metricPath)")!
-        components.queryItems = [
-            URLQueryItem(name: "a", value: "BTC"),
-            URLQueryItem(name: "i", value: interval),
-            URLQueryItem(name: "s", value: sinceTimestamp),
-            URLQueryItem(name: "api_key", value: apiKey)
-        ]
-
-        guard let url = components.url else {
-            throw FetchError.invalidURL
-        }
-
-        // Create minimal session configuration
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 20  // Reduced from 30
-        config.urlCache = nil
-        config.requestCachePolicy = .reloadIgnoringLocalCacheData
-
-        // Perform request - session will be deallocated immediately after
-        let (data, response) = try await URLSession(configuration: config).data(from: url)
-
-        // Check response
-        guard let http = response as? HTTPURLResponse else {
-            throw FetchError.httpError(0)
-        }
-
-        guard http.statusCode == 200 else {
-            throw FetchError.httpError(http.statusCode)
-        }
-
-        // Decode
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .secondsSince1970
-
-        guard let result = try? decoder.decode([TimeValue].self, from: data) else {
-            throw FetchError.decodingError
-        }
-
-        // Filter based on time range
-        let filteredResult: [TimeValue]
-        if timeRange == "today" {
-            // Get midnight of current day in local timezone, minus 30 minute margin
-            let calendar = Calendar.current
-            let today = calendar.startOfDay(for: Date())
-            let todayWithMargin = today.addingTimeInterval(-30 * 60)  // 30 minutes before midnight
-            // Filter to include data points from 30 minutes before midnight onwards
-            filteredResult = result.filter { $0.t >= todayWithMargin }
-        } else {
-            // Use all 24h data
-            filteredResult = result
-        }
-
-        // Limit based on interval to ensure we don't exceed memory
-        // 10m interval: max 144 points (24h), 1h interval: max 24 points (24h)
-        let maxPoints = interval == "10m" ? 144 : 24
-        let limitedResult = Array(filteredResult.suffix(maxPoints))
-
-        return limitedResult
+        // Use shared fetcher
+        return try await MetricDataFetcher.fetchMetricData(
+            metricId: metricId,
+            timeRange: timeRange,
+            apiKey: apiKey
+        )
     }
 }
 
@@ -131,25 +54,61 @@ struct Provider: AppIntentTimelineProvider {
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
 
-        } catch WidgetDataFetcher.FetchError.missingAPIKey {
+        } catch MetricDataFetcher.FetchError.missingAPIKey {
             // No API key configured
-            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "No API key configured. Please open the app and enter your Glassnode API key.", timeRange: timeRange)
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "API key missing\nOpen app to add key", timeRange: timeRange)
             let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
 
-        } catch WidgetDataFetcher.FetchError.httpError(401) {
-            // Invalid API key
-            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "Invalid API key. Please check your key in the app.", timeRange: timeRange)
-            let nextUpdate = Calendar.current.date(byAdding: .hour, value: 1, to: currentDate)!
+        } catch MetricDataFetcher.FetchError.httpError(let statusCode, let message) {
+            // HTTP errors with descriptive messages
+            let errorMsg: String
+            if let message = message, !message.isEmpty {
+                // Use API error message if available (truncate if too long)
+                errorMsg = message.count > 60 ? String(message.prefix(57)) + "..." : message
+            } else {
+                // Fallback to generic messages
+                switch statusCode {
+                case 401:
+                    errorMsg = "Invalid API key\nCheck key in app"
+                case 429:
+                    errorMsg = "Rate limited\nTry again later"
+                case 400..<500:
+                    errorMsg = "Invalid request\nError \(statusCode)"
+                case 500..<600:
+                    errorMsg = "Server error\nTry again later"
+                default:
+                    errorMsg = "Network error\nCheck connection"
+                }
+            }
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: errorMsg, timeRange: timeRange)
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
+            return Timeline(entries: [entry], policy: .after(nextUpdate))
+
+        } catch MetricDataFetcher.FetchError.decodingError {
+            // Decoding error
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "Data format error\nCheck metric config", timeRange: timeRange)
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
 
         } catch {
-            // Other errors
-            let errorMsg = "Error: \(error.localizedDescription)"
+            // Other errors - try to extract useful message
+            let errorMsg = formatErrorMessage(error)
             let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: errorMsg, timeRange: timeRange)
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
         }
+    }
+
+    // Format error messages to be more readable
+    private func formatErrorMessage(_ error: Error) -> String {
+        let description = error.localizedDescription
+        // Truncate long messages to fit widget
+        if description.count > 60 {
+            let truncated = description.prefix(57)
+            return "\(truncated)..."
+        }
+        return description
     }
 
     // Placeholder data for previews (lightweight - only 10 data points)
@@ -191,22 +150,16 @@ struct ChartWidgetEntryView : View {
     }
 
     var body: some View {
-        if let error = entry.error {
-            ErrorView(error: error)
-        } else if entry.data.isEmpty {
-            EmptyView()
-        } else {
-            // Use different views for lock screen vs home screen
-            switch family {
-            case .accessoryCircular:
-                LockScreenCircularView(data: entry.data, metricId: entry.metricId)
-            case .accessoryRectangular:
-                LockScreenRectangularView(data: entry.data, metricId: entry.metricId, timeRange: entry.timeRange)
-            case .accessoryInline:
-                LockScreenInlineView(data: entry.data, metricId: entry.metricId)
-            default:
-                ChartView(data: entry.data, metricId: entry.metricId, family: family, timeRangeLabel: timeRangeLabel, timeRange: entry.timeRange)
-            }
+        // Use different views for lock screen vs home screen
+        switch family {
+        case .accessoryCircular:
+            LockScreenCircularView(data: entry.data, metricId: entry.metricId, error: entry.error)
+        case .accessoryRectangular:
+            LockScreenRectangularView(data: entry.data, metricId: entry.metricId, timeRange: entry.timeRange, error: entry.error)
+        case .accessoryInline:
+            LockScreenInlineView(data: entry.data, metricId: entry.metricId, error: entry.error)
+        default:
+            ChartView(data: entry.data, metricId: entry.metricId, family: family, timeRangeLabel: timeRangeLabel, timeRange: entry.timeRange, error: entry.error)
         }
     }
 }
@@ -217,161 +170,20 @@ struct ChartView: View {
     let family: WidgetFamily
     let timeRangeLabel: String
     let timeRange: String
-    let asset: String = "BTC"  // Default to BTC for now
-
-    private var metricConfig: WidgetMetricConfig {
-        WidgetMetricConfig.config(for: metricId)
-    }
-
-    private var currentValue: Double {
-        data.last?.v ?? 0
-    }
-
-    private var percentChange: Double {
-        guard let first = data.first?.v, let last = data.last?.v, last > 0 else { return 0 }
-        return ((first - last) / last) * 100
-    }
-
-    private var isPositive: Bool {
-        percentChange >= 0
-    }
-
-    // Metric-specific colors
-    private var assetColors: (primary: Color, secondary: Color) {
-        (metricConfig.primaryColor, metricConfig.secondaryColor)
-    }
-
-    // Calculate chart Y domain with padding
-    private var chartYDomain: ClosedRange<Double> {
-        let values = data.map { $0.v }
-        return metricConfig.calculateRange(for: values)
-    }
-
-    // Calculate chart X domain for today mode (midnight to midnight)
-    private var todayXDomain: ClosedRange<Date> {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date())
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-        return startOfDay...endOfDay
-    }
+    let error: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("BTC: \(metricConfig.shortName)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(timeRangeLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-
-            // Current value & change
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(metricConfig.formatValue(currentValue))
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.semibold)
-
-                HStack(spacing: 0) {
-                    Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                        .font(.caption2)
-                    Text(metricConfig.formatChange(percentChange))
-                        .font(.caption)
-                }
-                .foregroundStyle(isPositive ? .green : .red)
-            }
-
-            // Chart - restored with gradient and smoothing
-            let sortedData = data.sorted(by: { $0.t < $1.t })
-
-            Chart {
-                // Baseline at starting value
-                if let startingValue = sortedData.first?.v {
-                    RuleMark(y: .value("Baseline", startingValue))
-                        .foregroundStyle(.white.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 2]))
-                }
-
-                // Add a neutral line at 1.0 for SOPR (spent output profit ratio)
-                if metricId == "indicators/sopr" && chartYDomain.contains(1.0) {
-                    RuleMark(y: .value("Break-even", 1.0))
-                        .foregroundStyle(.gray.opacity(0.5))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                }
-
-                // Data visualization
-                ForEach(sortedData) { item in
-                    // Area gradient - fill from line to bottom of chart domain
-                    AreaMark(
-                        x: .value("Time", item.t),
-                        yStart: .value("Baseline", chartYDomain.lowerBound),
-                        yEnd: .value("Value", item.v)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(
-                        LinearGradient(
-                            stops: [
-                                .init(color: assetColors.primary.opacity(0.4), location: 0),
-                                .init(color: assetColors.primary.opacity(0), location: 1.0)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                    // Solid color line
-                    LineMark(
-                        x: .value("Time", item.t),
-                        y: .value("Value", item.v)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(assetColors.primary)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5))
-                }
-            }
-            .chartXAxis {
-                AxisMarks(position: .bottom, values: .stride(by: .hour, count: 12)) { _ in
-                    AxisGridLine()
-                        .foregroundStyle(.clear)  // Explicitly clear the grid line
-                    AxisTick(stroke: StrokeStyle(lineWidth: 0.5))
-                        .foregroundStyle(.tertiary)
-                    AxisValueLabel(format: .dateTime.hour(), centered: true)
-                        .font(.system(size: 8))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .chartYAxis {
-                AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) { value in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                        .foregroundStyle(.tertiary.opacity(0.3))
-                    AxisValueLabel {
-                        if let doubleValue = value.as(Double.self) {
-                            Text(metricConfig.formatValue(doubleValue))
-                                .font(.system(size: 8))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .chartYScale(domain: chartYDomain)
-            .modifier(XScaleModifier(timeRange: timeRange, domain: todayXDomain))
-        }
-    }
-}
-
-// Conditional X-scale modifier
-struct XScaleModifier: ViewModifier {
-    let timeRange: String
-    let domain: ClosedRange<Date>
-
-    func body(content: Content) -> some View {
-        if timeRange == "today" {
-            content.chartXScale(domain: domain)
-        } else {
-            content
-        }
+        MetricChartView(
+            data: data,
+            metricId: metricId,
+            timeRange: timeRange,
+            showXAxis: true,
+            showYAxis: true,
+            showHeader: true,
+            showDeltaValue: false,
+            height: nil,
+            error: error
+        )
     }
 }
 
@@ -379,23 +191,34 @@ struct XScaleModifier: ViewModifier {
 struct LockScreenCircularView: View {
     let data: [TimeValue]
     let metricId: String
+    let error: String?
 
-    private var metricConfig: WidgetMetricConfig {
-        WidgetMetricConfig.config(for: metricId)
+    private var metricConfig: MetricConfig? {
+        MetricConfig.metric(withId: metricId)
     }
 
     private var currentValue: Double {
         data.last?.v ?? 0
     }
 
+    private var hasData: Bool {
+        !data.isEmpty && error == nil
+    }
+
     var body: some View {
         ZStack {
             AccessoryWidgetBackground()
             VStack(spacing: 2) {
-                Text(formatValueCompact(currentValue))
-                    .font(.system(.body, design: .rounded))
-                    .fontWeight(.semibold)
-                Text(metricConfig.shortName)
+                if hasData {
+                    Text(formatValueCompact(currentValue))
+                        .font(.system(.body, design: .rounded))
+                        .fontWeight(.semibold)
+                } else {
+                    Text(emptyValueCompact)
+                        .font(.system(.body, design: .rounded))
+                        .fontWeight(.semibold)
+                }
+                Text(metricConfig?.shortName ?? "Metric")
                     .font(.system(size: 8))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -403,8 +226,20 @@ struct LockScreenCircularView: View {
         }
     }
 
+    private var emptyValueCompact: String {
+        guard let config = metricConfig else { return "-" }
+        switch config.unit {
+        case .usd: return "$-"
+        case .percentage: return "-%"
+        case .ratio: return "-"
+        case .count: return "-"
+        case .hashRate: return "-"
+        case .btc: return "-"
+        }
+    }
+
     private func formatValueCompact(_ value: Double) -> String {
-        if metricConfig.isPercentage {
+        if metricConfig?.unit == .percentage {
             return "\(Int(value * 100))%"
         }
         if metricId.contains("price") {
@@ -428,147 +263,58 @@ struct LockScreenRectangularView: View {
     let data: [TimeValue]
     let metricId: String
     let timeRange: String
-    let asset: String = "BTC"  // Default to BTC for now
-
-    private var metricConfig: WidgetMetricConfig {
-        WidgetMetricConfig.config(for: metricId)
-    }
-
-    private var deltaValue: Double {
-        guard let first = data.first?.v, let last = data.last?.v else { return 0 }
-        return last - first
-    }
-
-    private var currentValue: Double {
-        data.last?.v ?? 0
-    }
-
-    private var percentChange: Double {
-        guard let first = data.first?.v, let last = data.last?.v, last > 0 else { return 0 }
-        return ((first - last) / last) * 100
-    }
-
-    private var isPositive: Bool {
-        percentChange >= 0
-    }
-
-    // Metric-specific colors
-    private var assetColors: (primary: Color, secondary: Color) {
-        (metricConfig.primaryColor, metricConfig.secondaryColor)
-    }
-
-    // Calculate chart Y domain with padding to zoom into data range
-    private var chartYDomain: ClosedRange<Double> {
-        let values = data.map { $0.v }
-        return metricConfig.calculateRange(for: values)
-    }
-
-    // Calculate chart X domain for today mode (midnight to midnight)
-    private var todayXDomain: ClosedRange<Date> {
-        let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: Date())
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-        return startOfDay...endOfDay
-    }
+    let error: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            // Title
-            HStack {
-                Text("\(asset): \(metricConfig.shortName)")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .opacity(0.5)
-            }
-            
-            HStack(spacing: 2) {
-                Text("\(metricConfig.formatValue(currentValue))")
-                    .font(.body)
-                    .fontWeight(.semibold)
-                Spacer()
-                Image(systemName: deltaValue > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
-                    .opacity(0.5)
-                    .font(.system(size: 8))
-                Text("\(metricConfig.formatValue(deltaValue))")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .opacity(0.5)
-            }
-
-            // Delta
-            /*
-             HStack(spacing: 2) {
-                Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 8))
-                Text(String(format: "%.2f%%", abs(percentChange)))
-                    .font(.system(size: 10))
-            }
-            .foregroundStyle(isPositive ? .green : .red)
-             */
-
-            // Chart with gradient
-            let sortedData = data.sorted(by: { $0.t < $1.t })
-            Chart {
-                // Baseline at starting value
-                if let startingValue = sortedData.first?.v {
-                    RuleMark(y: .value("Baseline", startingValue))
-                        .foregroundStyle(.white.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
-
-                ForEach(sortedData) { item in
-                    // Area gradient
-                    AreaMark(
-                        x: .value("Time", item.t),
-                        yStart: .value("Baseline", chartYDomain.lowerBound),
-                        yEnd: .value("Value", item.v)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(
-                        LinearGradient(
-                            stops: [
-                                .init(color: assetColors.primary.opacity(0.4), location: 0),
-                                .init(color: assetColors.primary.opacity(0), location: 1.0)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                    // Line
-                    LineMark(
-                        x: .value("Time", item.t),
-                        y: .value("Value", item.v)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(assetColors.primary)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
-                }
-            }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            .chartYScale(domain: chartYDomain)
-            .modifier(XScaleModifier(timeRange: timeRange, domain: todayXDomain))
-            .frame(height: 30)
-        }
+        MetricChartView(
+            data: data,
+            metricId: metricId,
+            timeRange: timeRange,
+            showXAxis: false,
+            showYAxis: false,
+            showHeader: true,
+            showDeltaValue: true,
+            height: 30,
+            error: error
+        )
     }
 }
 
 struct LockScreenInlineView: View {
     let data: [TimeValue]
     let metricId: String
+    let error: String?
 
-    private var metricConfig: WidgetMetricConfig {
-        WidgetMetricConfig.config(for: metricId)
+    private var metricConfig: MetricConfig? {
+        MetricConfig.metric(withId: metricId)
     }
 
     private var currentValue: Double {
         data.last?.v ?? 0
     }
 
+    private var hasData: Bool {
+        !data.isEmpty && error == nil
+    }
+
+    private var emptyValue: String {
+        guard let config = metricConfig else { return "-" }
+        switch config.unit {
+        case .usd: return "$-"
+        case .percentage: return "-%"
+        case .ratio: return "-"
+        case .count: return "-"
+        case .hashRate: return "-"
+        case .btc: return "- BTC"
+        }
+    }
+
     var body: some View {
-        Text("BTC: \(metricConfig.formatValue(currentValue)) \(metricConfig.shortName)")
+        if hasData {
+            Text("BTC: \(metricConfig?.formatValue(currentValue) ?? String(format: "%.2f", currentValue)) \(metricConfig?.shortName ?? "Metric")")
+        } else {
+            Text("BTC: \(emptyValue) \(metricConfig?.shortName ?? "Metric")")
+        }
     }
 }
 
@@ -619,44 +365,51 @@ struct ChartWidget: Widget {
     }
 }
 
-#Preview(as: .systemSmall) {
+#Preview("Small Widget", as: .systemSmall) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
-#Preview(as: .systemMedium) {
+#Preview("Medium Widget", as: .systemMedium) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
-#Preview(as: .systemLarge) {
+#Preview("Large Widget", as: .systemLarge) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
-#Preview(as: .systemExtraLarge) {
+#Preview("Extra Large Widget", as: .systemExtraLarge) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
-#Preview(as: .accessoryCircular) {
+#Preview("Circular Lock Screen", as: .accessoryCircular) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
-#Preview(as: .accessoryRectangular) {
+#Preview("Rectangular Lock Screen", as: .accessoryRectangular) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
 
-#Preview(as: .accessoryInline) {
+#Preview("Inline Lock Screen", as: .accessoryInline) {
     ChartWidget()
 } timeline: {
     SimpleEntry(date: .now, metricId: "supply/profit_relative", data: Provider.placeholderData, error: nil, timeRange: "24h")
 }
+
+#Preview("Error State", as: .systemMedium) {
+    ChartWidget()
+} timeline: {
+    SimpleEntry(date: .now, metricId: "supply/profit_relative", data: [], error: "API key missing\nOpen app to add key", timeRange: "24h")
+}
+

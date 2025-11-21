@@ -105,14 +105,6 @@ extension JSONDecoder {
     }
 }
 
-// MARK: - Models for time series
-struct TimeValue: Decodable, Identifiable {
-    let t: Date
-    let v: Double
-
-    var id: Date { t }
-}
-
 // MARK: - Endpoints
 enum GlassnodeEndpoint {
     // Generic metric endpoint

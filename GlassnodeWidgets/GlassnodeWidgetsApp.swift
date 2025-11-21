@@ -13,10 +13,17 @@ import Security
 struct GlassnodeWidgetsApp: App {
     let glassnodeService = GlassnodeService()
 
+    init() {
+        // Migrate existing API key to use kSecAttrAccessibleAfterFirstUnlock
+        // This ensures widgets can access the key even when device is locked
+        let keychainClient = KeychainClient()
+        try? keychainClient.migrateAPIKeyAccessibility()
+    }
+
     var body: some Scene {
         WindowGroup {
             NavigationStack {
-                SettingsView()
+                HomeView()
                     .navigationTitle("Glassnode Widgets")
                     .environment(\.glassnodeService, glassnodeService)
 #if os(macOS)

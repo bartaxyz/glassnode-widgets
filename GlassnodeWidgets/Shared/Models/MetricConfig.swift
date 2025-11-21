@@ -8,6 +8,12 @@
 import Foundation
 import SwiftUI
 
+/// Delta display mode
+enum DeltaDisplayMode: String, Codable {
+    case absolute   // Show absolute value difference (e.g., "+$1,234")
+    case relative   // Show percentage change (e.g., "+5.2%")
+}
+
 /// Configuration for a Glassnode metric
 struct MetricConfig: Identifiable, Codable {
     let id: String              // API metric ID (e.g., "market/price_usd_close")
@@ -15,8 +21,8 @@ struct MetricConfig: Identifiable, Codable {
     let shortName: String       // Short name for compact displays
     let unit: MetricUnit        // Unit type
     let visualRange: VisualRange // Visualization range
-    let color: MetricColor      // Primary color for the metric
     let interval: String        // API interval (e.g., "10m", "1h", "24h")
+    let deltaDisplayMode: DeltaDisplayMode // How to display change (absolute or relative)
 
     /// API path for this metric
     var apiPath: String {
@@ -138,8 +144,8 @@ extension MetricConfig {
         shortName: "Price",
         unit: .usd,
         visualRange: .dynamic(padding: 0.1),
-        color: .orange,
-        interval: "10m"
+        interval: "10m",
+        deltaDisplayMode: .absolute
     )
 
     /// Market Capitalization (USD)
@@ -149,8 +155,8 @@ extension MetricConfig {
         shortName: "Market Cap",
         unit: .usd,
         visualRange: .dynamic(padding: 0.1),
-        color: .blue,
-        interval: "10m"
+        interval: "10m",
+        deltaDisplayMode: .absolute
     )
 
     /// Percent Supply in Profit
@@ -160,8 +166,8 @@ extension MetricConfig {
         shortName: "Supply in Profit",
         unit: .percentage,
         visualRange: .dynamic(padding: 0.15),
-        color: .green,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .relative
     )
 
     /// Active Addresses
@@ -171,8 +177,8 @@ extension MetricConfig {
         shortName: "Active Addresses",
         unit: .count,
         visualRange: .dynamic(padding: 0.15),
-        color: .blue,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .absolute
     )
 
     /// Transaction Count
@@ -182,8 +188,8 @@ extension MetricConfig {
         shortName: "Transactions",
         unit: .count,
         visualRange: .dynamic(padding: 0.15),
-        color: .purple,
-        interval: "10m"
+        interval: "1h",
+        deltaDisplayMode: .absolute
     )
 
     /// MVRV Ratio
@@ -193,8 +199,8 @@ extension MetricConfig {
         shortName: "MVRV",
         unit: .ratio,
         visualRange: .dynamic(padding: 0.15),
-        color: .orange,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .relative
     )
 
     /// Hash Rate
@@ -204,8 +210,8 @@ extension MetricConfig {
         shortName: "Hash Rate",
         unit: .hashRate,
         visualRange: .dynamic(padding: 0.1),
-        color: .green,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .absolute
     )
 
     /// Supply Last Active 1+ Years Ago
@@ -215,8 +221,8 @@ extension MetricConfig {
         shortName: "1Y+ Supply",
         unit: .percentage,
         visualRange: .dynamic(padding: 0.15),
-        color: .blue,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .relative
     )
 
     /// SOPR (Spent Output Profit Ratio)
@@ -226,8 +232,8 @@ extension MetricConfig {
         shortName: "SOPR",
         unit: .ratio,
         visualRange: .dynamic(padding: 0.15),
-        color: .purple,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .relative
     )
 
     /// NUPL (Net Unrealized Profit/Loss)
@@ -237,8 +243,8 @@ extension MetricConfig {
         shortName: "NUPL",
         unit: .ratio,
         visualRange: .dynamic(padding: 0.15),
-        color: .orange,
-        interval: "1h"
+        interval: "1h",
+        deltaDisplayMode: .relative
     )
 
     /// Get metric by ID
