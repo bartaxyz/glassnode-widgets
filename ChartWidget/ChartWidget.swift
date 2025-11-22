@@ -14,6 +14,11 @@ struct WidgetDataFetcher {
     static func fetchData(metricId: String = "supply/profit_relative", timeRange: String = "24h") async throws -> [TimeValue] {
         // Read API key from keychain
         let keychain = KeychainClient()
+
+        // readAPIKey() will:
+        // - Return nil if no key is configured
+        // - Throw KeychainError.interactionNotAllowed if device is locked (error -25308)
+        // - Return the key if successful
         guard let apiKey = try keychain.readAPIKey(), !apiKey.isEmpty else {
             throw MetricDataFetcher.FetchError.missingAPIKey
         }
@@ -52,6 +57,14 @@ struct Provider: AppIntentTimelineProvider {
 
             // Update every 15 minutes
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: currentDate)!
+            return Timeline(entries: [entry], policy: .after(nextUpdate))
+
+        } catch KeychainClient.KeychainError.interactionNotAllowed {
+            // Device is locked and keychain can't be accessed (error -25308)
+            // This should be temporary - retry sooner
+            let entry = SimpleEntry(date: currentDate, metricId: metricId, data: [], error: "Device locked\nUnlock to update", timeRange: timeRange)
+            // Retry after 2 minutes when device might be unlocked
+            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 2, to: currentDate)!
             return Timeline(entries: [entry], policy: .after(nextUpdate))
 
         } catch MetricDataFetcher.FetchError.missingAPIKey {
